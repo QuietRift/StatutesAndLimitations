@@ -7,7 +7,7 @@ struct MainTabView: View {
     private enum AppTab: Hashable { case chat, laws, history }
 
     @State private var selectedTab = AppTab.chat
-    @State private var history = ChatHistoryStore()
+    @State private var history = ChatHistoryStore.shared
     @State private var pendingQuestion: String?
 
     private var state: USState { USState(rawValue: stateCode) ?? .michigan }

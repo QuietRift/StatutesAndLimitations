@@ -5,6 +5,10 @@ import FoundationModels
 protocol ChatResponder {
     /// Yields the full response text so far each time new tokens arrive.
     func streamReply(to prompt: String) -> AsyncThrowingStream<String, Error>
+
+    /// Returns the complete reply at once. Preferred when running in the background (like Siri),
+    /// where streaming is more likely to be rate-limited.
+    func reply(to prompt: String) async throws -> String
 }
 
 enum LocalAssistant {
@@ -53,7 +57,8 @@ private final class FoundationModelResponder: ChatResponder {
             Give general legal information, not legal advice, and suggest contacting a \
             licensed \(state.name) attorney for a specific situation. \
             If you’re unsure of a specific statute or penalty, say so instead of guessing. \
-            For emergencies, tell the person to call 911.
+            For emergencies, tell the person to call 911. \
+            Always reply in the same language the person uses, and switch languages whenever they do.
             """)
         session.prewarm()
     }
@@ -72,5 +77,9 @@ private final class FoundationModelResponder: ChatResponder {
             }
             continuation.onTermination = { _ in task.cancel() }
         }
+    }
+
+    func reply(to prompt: String) async throws -> String {
+        try await session.respond(to: prompt).content
     }
 }

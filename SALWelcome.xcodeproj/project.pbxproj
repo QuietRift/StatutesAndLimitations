@@ -17,6 +17,9 @@
 		1B42960530B7361300F6A007 /* LawsAtAGlanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B42960430B7361300F6A007 /* LawsAtAGlanceView.swift */; };
 		1B42960730B7361900F6A007 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B42960630B7361900F6A007 /* HistoryView.swift */; };
 		1B42960930B7361D00F6A007 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B42960830B7361D00F6A007 /* MainTabView.swift */; };
+		1B42960B30B73C2C00F6A007 /* SpeechLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B42960A30B73C2C00F6A007 /* SpeechLanguage.swift */; };
+		1B42960D30B73CC000F6A007 /* AskSALIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B42960C30B73CC000F6A007 /* AskSALIntent.swift */; };
+		1B42960F30B73CD600F6A007 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B42960E30B73CD600F6A007 /* CarPlaySceneDelegate.swift */; };
 		1E8CE41630EC02510E7BCAC2 /* SALApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CF4129FA8085CBF66B149A5 /* SALApp.swift */; };
 		3404C523ECA644612F373279 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF0248AE5A974955D0FEF70 /* WelcomeView.swift */; };
 		438B646351DD70866ED67BBA /* USState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F4B982BD1D9BED7A00E8004 /* USState.swift */; };
@@ -35,7 +38,10 @@
 		1B42960230B735DE00F6A007 /* ChatHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHistoryStore.swift; sourceTree = "<group>"; };
 		1B42960430B7361300F6A007 /* LawsAtAGlanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LawsAtAGlanceView.swift; sourceTree = "<group>"; };
 		1B42960630B7361900F6A007 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
-		1B42960830B7361D00F6A007 /* MainTabView.swift */ = {isa = PBXFileReference; path = MainTabView.swift; sourceTree = "<group>"; };
+		1B42960830B7361D00F6A007 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		1B42960A30B73C2C00F6A007 /* SpeechLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechLanguage.swift; sourceTree = "<group>"; };
+		1B42960C30B73CC000F6A007 /* AskSALIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskSALIntent.swift; sourceTree = "<group>"; };
+		1B42960E30B73CD600F6A007 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		251DC0B2E6B2F0ECB36BA7BD /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		33439D00203BA5F1DFFD1DC0 /* StateSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StateSelectionView.swift; sourceTree = "<group>"; };
 		3369DAFFDF1BFEB15563947E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -77,6 +83,9 @@
 				1B42960430B7361300F6A007 /* LawsAtAGlanceView.swift */,
 				1B42960630B7361900F6A007 /* HistoryView.swift */,
 				1B42960830B7361D00F6A007 /* MainTabView.swift */,
+				1B42960A30B73C2C00F6A007 /* SpeechLanguage.swift */,
+				1B42960C30B73CC000F6A007 /* AskSALIntent.swift */,
+				1B42960E30B73CD600F6A007 /* CarPlaySceneDelegate.swift */,
 			);
 			path = SAL;
 			sourceTree = "<group>";
@@ -174,12 +183,15 @@
 				1B42960730B7361900F6A007 /* HistoryView.swift in Sources */,
 				1B42960530B7361300F6A007 /* LawsAtAGlanceView.swift in Sources */,
 				637FBAEE48AE16620CF23832 /* StateLocationManager.swift in Sources */,
+				1B42960F30B73CD600F6A007 /* CarPlaySceneDelegate.swift in Sources */,
 				1B4295FD30B7344D00F6A007 /* ChatModel.swift in Sources */,
 				3404C523ECA644612F373279 /* WelcomeView.swift in Sources */,
 				1B42960330B735DE00F6A007 /* ChatHistoryStore.swift in Sources */,
+				1B42960B30B73C2C00F6A007 /* SpeechLanguage.swift in Sources */,
 				1B4295FB30B7343200F6A007 /* SpeechServices.swift in Sources */,
 				1B42960930B7361D00F6A007 /* MainTabView.swift in Sources */,
 				1B4295F930B7342500F6A007 /* LocalAssistant.swift in Sources */,
+				1B42960D30B73CC000F6A007 /* AskSALIntent.swift in Sources */,
 				081FF88E0F4A9DF7CB3E8B9F /* StateSelectionView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

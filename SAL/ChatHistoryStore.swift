@@ -24,6 +24,9 @@ struct Conversation: Identifiable, Codable, Hashable {
 @MainActor
 @Observable
 final class ChatHistoryStore {
+    /// One store shared by the phone UI, CarPlay, and Siri so none overwrites the others' saves.
+    static let shared = ChatHistoryStore()
+
     private(set) var conversations: [Conversation] = []
 
     @ObservationIgnored private let fileURL: URL
