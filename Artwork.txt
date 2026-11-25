@@ -1,0 +1,7 @@
+WelcomeRoad.png
+Generated with the built-in imagegen tool as a static asset. No image-generation or AI service is used by the app at runtime.
+
+Prompt:
+Use case: photorealistic-natural. Asset type: static photographic background for a traffic-rights iPhone welcome screen, not a UI mockup. Create a wide landscape photograph of a slightly wet suburban two-lane asphalt road at blue hour. Viewpoint looking forward from low on the road, double yellow lines leading toward the horizon. A softly out-of-focus police SUV near the right-hand side of the horizon, with bright cyan/blue and red emergency lightbar lights, colored reflections on wet pavement. Dark tree line across the distant horizon. Atmospheric soft shallow focus, deliberately blurred detail, no people, no car logos, absolutely no text or lettering, no badges, no phone frame, no interface, no watermarks. Clean pale blue-gray dusk sky occupies upper 35 percent, asphalt road lower 50 percent. Composition suitable for cropping to a phone width; vehicle and lights remain within central 65 percent. Calm cinematic photographic realism.
+
+The app icon is a vector-drawn shield and scales, rasterized to an opaque 1024px iOS app icon. The welcome-screen logo uses Apple's SF Symbols.
