@@ -128,6 +128,8 @@ final class ChatModel {
                     errorMessage = "SAL couldn’t answer that. \(error.localizedDescription)"
                 }
             }
+            // A cancelled reply belongs to a conversation that was already reset.
+            guard !Task.isCancelled else { return }
             isThinking = false
             saveToHistory()
         }

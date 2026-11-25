@@ -1,15 +1,19 @@
 import SwiftUI
 
 struct ChatView: View {
-    let onChangeState: () -> Void
+    /// A question handed over from another tab, such as Laws At A Glance. Cleared once sent.
+    @Binding var pendingQuestion: String?
+    let onSelectState: (USState) -> Void
 
     @State private var model: ChatModel
+    @State private var showsStatePicker = false
     @FocusState private var isComposerFocused: Bool
     @ScaledMetric(relativeTo: .largeTitle) private var orbSize = 170.0
 
-    init(state: USState, onChangeState: @escaping () -> Void) {
-        self.onChangeState = onChangeState
-        _model = State(initialValue: ChatModel(state: state))
+    init(state: USState, history: ChatHistoryStore, pendingQuestion: Binding<String?>, onSelectState: @escaping (USState) -> Void) {
+        _pendingQuestion = pendingQuestion
+        self.onSelectState = onSelectState
+        _model = State(initialValue: ChatModel(state: state, history: history))
     }
 
     var body: some View {
@@ -33,16 +37,16 @@ struct ChatView: View {
                 messageList
             }
             .safeAreaInset(edge: .bottom, spacing: 0) { composer }
-            .navigationTitle("SAL · \(model.state.name)")
+            .navigationTitle("SAL")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Change state") {
-                        model.tearDown()
-                        onChangeState()
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    Button(action: model.startNewChat) {
+                        Image(systemName: "square.and.pencil")
                     }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
+                    .disabled(!model.hasConversation)
+                    .accessibilityLabel("New chat")
+
                     Button {
                         model.speaksReplies.toggle()
                         if !model.speaksReplies { model.stopSpeaking() }
@@ -50,6 +54,30 @@ struct ChatView: View {
                         Image(systemName: model.speaksReplies ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     }
                     .accessibilityLabel(model.speaksReplies ? "Mute SAL’s voice" : "Unmute SAL’s voice")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showsStatePicker = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "mappin.and.ellipse")
+                            Text(model.state.rawValue)
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .accessibilityLabel("State: \(model.state.name)")
+                    .accessibilityHint("Changes which state’s laws SAL covers.")
+                }
+            }
+            .sheet(isPresented: $showsStatePicker) {
+                StateSelectionView(
+                    suggestedState: model.state,
+                    message: "Choose which state’s laws you want SAL to cover."
+                ) { state in
+                    showsStatePicker = false
+                    guard state != model.state else { return }
+                    model.tearDown()
+                    onSelectState(state)
                 }
             }
             .alert("Something went wrong", isPresented: Binding(
@@ -61,8 +89,18 @@ struct ChatView: View {
                 Text(model.errorMessage ?? "")
             }
         }
-        .onAppear { model.greetIfNeeded() }
-        .onDisappear { model.tearDown() }
+        .onAppear {
+            model.greetIfNeeded()
+            sendPendingQuestion()
+        }
+        .onChange(of: pendingQuestion) { sendPendingQuestion() }
+        .onDisappear { model.pauseAudio() }
+    }
+
+    private func sendPendingQuestion() {
+        guard let question = pendingQuestion else { return }
+        pendingQuestion = nil
+        model.send(question)
     }
 
     private var statusText: String {
@@ -131,7 +169,7 @@ struct ChatView: View {
     }
 }
 
-private struct MessageBubble: View {
+struct MessageBubble: View {
     let message: ChatModel.Message
 
     private var isUser: Bool { message.role == .user }
@@ -162,5 +200,5 @@ private struct MessageBubble: View {
 }
 
 #Preview {
-    ChatView(state: .michigan, onChangeState: {})
+    ChatView(state: .michigan, history: ChatHistoryStore(fileName: "preview-history.json"), pendingQuestion: .constant(nil), onSelectState: { _ in })
 }

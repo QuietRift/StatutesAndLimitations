@@ -19,13 +19,49 @@ final class SpeechOutput: NSObject {
     }
 
     func speak(_ text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let utterance = AVSpeechUtterance(string: trimmed)
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        let cleaned = Self.cleanForSpeech(text)
+        guard !cleaned.isEmpty else { return }
+        if pendingUtterances == 0 { Self.configureSessionForSpeech() }
+
+        let utterance = AVSpeechUtterance(string: cleaned)
+        utterance.voice = Self.preferredVoice
+        // A touch slower than default with no extra gaps reads more like a person talking.
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.96
+        utterance.preUtteranceDelay = 0
+        utterance.postUtteranceDelay = 0
+        utterance.prefersAssistiveTechnologySettings = true
         pendingUtterances += 1
         isSpeaking = true
         synthesizer.speak(utterance)
+    }
+
+    /// The most natural installed US English voice: Premium, then Enhanced, then the default.
+    /// People can download Premium voices in Settings › Accessibility › Spoken Content › Voices.
+    private static let preferredVoice: AVSpeechSynthesisVoice? = {
+        let candidates = AVSpeechSynthesisVoice.speechVoices().filter {
+            $0.language == "en-US" && !$0.voiceTraits.contains(.isNoveltyVoice)
+        }
+        return candidates.max { $0.quality.rawValue < $1.quality.rawValue }
+            ?? AVSpeechSynthesisVoice(language: "en-US")
+    }()
+
+    /// Uses the spoken-audio playback mode, which is tuned for voice and avoids the
+    /// thinner sound of the record-enabled session used while listening.
+    private static func configureSessionForSpeech() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try? session.setActive(true)
+    }
+
+    /// Strips formatting the model sometimes adds so the voice doesn't read symbols aloud.
+    private static func cleanForSpeech(_ text: String) -> String {
+        var result = text
+        for symbol in ["**", "__", "`", "#", "* ", "- "] {
+            result = result.replacingOccurrences(of: symbol, with: symbol.hasSuffix(" ") ? " " : "")
+        }
+        return result
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func stop() {
@@ -54,7 +90,11 @@ extension SpeechOutput: AVSpeechSynthesizerDelegate {
     }
 }
 
-/// Transcribes the microphone on-device so the person can talk to SAL.
+/// Transcribes the microphone so the person can talk to SAL.
+///
+/// Uses `SpeechAnalyzer` and `SpeechTranscriber`, which run entirely on the device.
+/// Audio and transcripts are never sent to Apple, and only microphone permission is needed.
+/// (The older `SFSpeechRecognizer` shows a system prompt saying speech goes to Apple.)
 @MainActor
 @Observable
 final class SpeechInput {
@@ -63,8 +103,8 @@ final class SpeechInput {
 
         var errorDescription: String? {
             switch self {
-            case .notAuthorized: "Allow microphone and speech recognition access in Settings to talk to SAL."
-            case .unavailable: "On-device speech recognition isn’t available right now. You can type instead."
+            case .notAuthorized: "Allow microphone access in Settings to talk to SAL."
+            case .unavailable: "On-device speech recognition isn’t available on this device. You can type instead."
             }
         }
     }
@@ -72,69 +112,135 @@ final class SpeechInput {
     private(set) var isListening = false
     private(set) var transcript = ""
 
-    @ObservationIgnored private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-    @ObservationIgnored private let audioEngine = AVAudioEngine()
-    @ObservationIgnored private var request: SFSpeechAudioBufferRecognitionRequest?
-    @ObservationIgnored private var task: SFSpeechRecognitionTask?
+    /// Holds an `OnDeviceTranscription`; typed loosely because that class needs iOS 26.
+    @ObservationIgnored private var transcription: AnyObject?
 
     func start() async throws {
-        guard await Self.requestAuthorization() else { throw InputError.notAuthorized }
-        guard let recognizer, recognizer.isAvailable, recognizer.supportsOnDeviceRecognition else {
-            throw InputError.unavailable
-        }
+        guard #available(iOS 26.0, *) else { throw InputError.unavailable }
+        guard await AVAudioApplication.requestRecordPermission() else { throw InputError.notAuthorized }
 
         stop()
         transcript = ""
 
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
-
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = true
-        // Keep everything on the device; nothing is sent to a server.
-        request.requiresOnDeviceRecognition = true
-        self.request = request
-
-        let input = audioEngine.inputNode
-        input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0)) { buffer, _ in
-            request.append(buffer)
+        let transcription = OnDeviceTranscription()
+        self.transcription = transcription
+        try await transcription.start { [weak self] text in
+            self?.transcript = text
         }
-        audioEngine.prepare()
-        try audioEngine.start()
         isListening = true
-
-        task = recognizer.recognitionTask(with: request) { [weak self] result, error in
-            let text = result?.bestTranscription.formattedString
-            let isFinal = result?.isFinal ?? false
-            Task { @MainActor in
-                guard let self else { return }
-                if let text { self.transcript = text }
-                if error != nil || isFinal { self.stop() }
-            }
-        }
     }
 
     /// Stops listening and returns what was heard.
     @discardableResult
     func stop() -> String {
+        if #available(iOS 26.0, *), let transcription = transcription as? OnDeviceTranscription {
+            transcription.stop()
+        }
+        transcription = nil
+        isListening = false
+        return transcript
+    }
+}
+
+@available(iOS 26.0, *)
+@MainActor
+private final class OnDeviceTranscription {
+    private let audioEngine = AVAudioEngine()
+    private var analyzer: SpeechAnalyzer?
+    private var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
+    private var resultsTask: Task<Void, Never>?
+
+    func start(onText: @escaping @MainActor (String) -> Void) async throws {
+        guard SpeechTranscriber.isAvailable,
+              let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: "en-US")) else {
+            throw SpeechInput.InputError.unavailable
+        }
+        let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
+
+        // The speech model is downloaded once from Apple if it isn't already on the device.
+        // This only downloads; no audio is uploaded.
+        if let installation = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            try await installation.downloadAndInstall()
+        }
+        guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
+            throw SpeechInput.InputError.unavailable
+        }
+
+        // Finalized phrases accumulate; the in-progress (volatile) phrase is shown after them.
+        resultsTask = Task {
+            var finalized = ""
+            do {
+                for try await result in transcriber.results {
+                    let text = String(result.text.characters)
+                    if result.isFinal {
+                        finalized += text
+                        onText(finalized)
+                    } else {
+                        onText(finalized + text)
+                    }
+                }
+            } catch {}
+        }
+
+        let (inputs, continuation) = AsyncStream.makeStream(of: AnalyzerInput.self)
+        inputContinuation = continuation
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        self.analyzer = analyzer
+        try await analyzer.start(inputSequence: inputs)
+
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
+        try session.setActive(true, options: .notifyOthersOnDeactivation)
+
+        // Convert microphone buffers to the analyzer's format and feed them in.
+        let input = audioEngine.inputNode
+        let micFormat = input.outputFormat(forBus: 0)
+        guard let converter = AVAudioConverter(from: micFormat, to: format) else {
+            throw SpeechInput.InputError.unavailable
+        }
+        input.installTap(onBus: 0, bufferSize: 4096, format: micFormat) { buffer, _ in
+            guard let converted = Self.convert(buffer, with: converter, to: format) else { return }
+            continuation.yield(AnalyzerInput(buffer: converted))
+        }
+        audioEngine.prepare()
+        try audioEngine.start()
+    }
+
+    /// Resamples a microphone buffer into the format the speech model expects.
+    private nonisolated static func convert(_ buffer: AVAudioPCMBuffer, with converter: AVAudioConverter, to format: AVAudioFormat) -> AVAudioPCMBuffer? {
+        let ratio = format.sampleRate / buffer.format.sampleRate
+        let capacity = AVAudioFrameCount((Double(buffer.frameLength) * ratio).rounded(.up))
+        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
+
+        var consumed = false
+        var error: NSError?
+        let status = converter.convert(to: output, error: &error) { _, inputStatus in
+            if consumed {
+                inputStatus.pointee = .noDataNow
+                return nil
+            }
+            consumed = true
+            inputStatus.pointee = .haveData
+            return buffer
+        }
+        guard status != .error, output.frameLength > 0 else { return nil }
+        return output
+    }
+
+    func stop() {
         if audioEngine.isRunning {
             audioEngine.stop()
             audioEngine.inputNode.removeTap(onBus: 0)
         }
-        request?.endAudio()
-        task?.cancel()
-        request = nil
-        task = nil
-        isListening = false
-        return transcript
-    }
-
-    private static func requestAuthorization() async -> Bool {
-        let speechStatus = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
+        inputContinuation?.finish()
+        inputContinuation = nil
+        let analyzer = analyzer
+        let resultsTask = resultsTask
+        self.analyzer = nil
+        self.resultsTask = nil
+        Task {
+            try? await analyzer?.finalizeAndFinishThroughEndOfInput()
+            resultsTask?.cancel()
         }
-        guard speechStatus == .authorized else { return false }
-        return await AVAudioApplication.requestRecordPermission()
     }
 }

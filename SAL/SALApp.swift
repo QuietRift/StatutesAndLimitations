@@ -10,15 +10,7 @@ struct SALApp: App {
     var body: some Scene {
         WindowGroup {
             if onboardingCompleted {
-                let state = USState(rawValue: selectedStateCode) ?? .michigan
-                // Replace this handoff view with your real home page when ready.
-                ContentUnavailableView {
-                    Label("\(state.name) selected", systemImage: "checkmark.seal")
-                } description: {
-                    Text("Your state is set. SAL’s traffic-law information covers \(state.name).")
-                } actions: {
-                    Button("Change state") { onboardingCompleted = false }
-                }
+                MainTabView(stateCode: $selectedStateCode)
             } else {
                 WelcomeView { state in
                     selectedStateCode = state.rawValue
